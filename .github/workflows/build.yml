@@ -23,7 +23,7 @@ jobs:
         python -m build
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # 升级到 v4
       with:
         name: distributions
-        path: dist/
+        path: dist/*  # 明确指定路径格式
