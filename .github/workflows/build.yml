@@ -1,4 +1,4 @@
-name: Build Linux and Windows Packages (Fixed)
+name: Build Linux and Windows Packages
 
 on: [push]
 
@@ -13,9 +13,8 @@ jobs:
           python-version: "3.9"
       - name: Install dependencies
         run: |
-          # 先安装旧版本 pip，再分步升级
-          python -m pip install --disable-pip-version-check pip==23.0.1
-          python -m pip install --upgrade pip setuptools wheel build pybind11
+          python -m pip install --upgrade pip
+          pip install pybind11 setuptools wheel build
       - name: Build sdist
         run: python -m build --sdist --no-isolation
       - name: Upload sdist
@@ -28,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]  # 仅保留 Linux 和 Windows
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
@@ -36,32 +35,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      
-      # Windows 安装编译工具
       - name: Install C++ build tools (Windows only)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install visualstudio2022-workload-vctools -y
-
-      # 分步安装依赖，避免 pip 升级冲突
+          choco install visualstudio2022-workload-vctools -y  # 仅 Windows 需要安装编译工具
       - name: Install dependencies
         run: |
-          # 先安装基础依赖
-          python -m pip install --disable-pip-version-check pip==23.0.1
-          python -m pip install setuptools wheel build pybind11
-          # 再单独升级 pip（可选）
           python -m pip install --upgrade pip
-
-      # 构建步骤（保持不变）
+          pip install pybind11 setuptools wheel build
       - name: Build Wheel
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            export CXXFLAGS="-std=c++11 -pthread"
-          elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            export CFLAGS="/MT"
-            export CXXFLAGS="/MT /EHsc"
-          fi
-          python -m build --wheel --no-isolation
+        run: python -m build --wheel --no-isolation
       - name: Upload Wheel
         uses: actions/upload-artifact@v4
         with:
@@ -75,11 +58,10 @@ jobs:
       - name: Build manylinux wheels
         uses: pypa/cibuildwheel@v2.16.2
         env:
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          CIBW_ARCHS: "x86_64"
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-          CIBW_BEFORE_BUILD: "pip install pybind11"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014  # 与本地一致
           CIBW_ENVIRONMENT: "CXXFLAGS='-std=c++11 -pthread'"
+          CIBW_BEFORE_BUILD: "pip install pybind11"
+          CIBW_BUILD_VERBOSITY: 3  # 启用详细日志
       - name: Upload manylinux Wheels
         uses: actions/upload-artifact@v4
         with:
