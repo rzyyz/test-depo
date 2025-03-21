@@ -58,10 +58,10 @@ jobs:
       - name: Build manylinux wheels
         uses: pypa/cibuildwheel@v2.16.2
         env:
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          CIBW_ARCHS: "x86_64"
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014  # 与本地一致
+          CIBW_ENVIRONMENT: "CXXFLAGS='-std=c++11 -pthread'"
           CIBW_BEFORE_BUILD: "pip install pybind11"
+          CIBW_BUILD_VERBOSITY: 3  # 启用详细日志
       - name: Upload manylinux Wheels
         uses: actions/upload-artifact@v4
         with:
