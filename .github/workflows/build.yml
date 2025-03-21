@@ -1,4 +1,4 @@
-name: Build Linux and Windows Packages
+name: Build Linux and Windows Packages (Thread-Safe)
 
 on: [push]
 
@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]  # 仅保留 Linux 和 Windows
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
@@ -35,22 +35,42 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      
+      # Windows 强制指定静态运行时库和调试符号
       - name: Install C++ build tools (Windows only)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install visualstudio2022-workload-vctools -y  # 仅 Windows 需要安装编译工具
+          choco install visualstudio2022-workload-vctools -y
+
+      # 所有平台安装编译依赖
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pybind11 setuptools wheel build
+
+      # 关键修改：显式传递编译参数
       - name: Build Wheel
-        run: python -m build --wheel --no-isolation
+        run: |
+          # Linux 添加多线程和 C++11 标准
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            export CXXFLAGS="-std=c++11 -pthread"
+          fi
+          
+          # Windows 强制使用静态运行时库
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export CFLAGS="/MT"
+            export CXXFLAGS="/MT /EHsc"
+          fi
+          
+          python -m build --wheel --no-isolation
+
       - name: Upload Wheel
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.python-version }}
           path: dist/*.whl
 
+  # 关键修改：manylinux 构建添加线程安全参数
   build_manylinux_wheels:
     runs-on: ubuntu-latest
     steps:
@@ -58,10 +78,12 @@ jobs:
       - name: Build manylinux wheels
         uses: pypa/cibuildwheel@v2.16.2
         env:
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014  # 与本地一致
-          CIBW_ENVIRONMENT: "CXXFLAGS='-std=c++11 -pthread'"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_ARCHS: "x86_64"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
           CIBW_BEFORE_BUILD: "pip install pybind11"
-          CIBW_BUILD_VERBOSITY: 3  # 启用详细日志
+          CIBW_ENVIRONMENT: "CXXFLAGS='-std=c++11 -pthread'"  # 强制多线程支持
+          CIBW_BUILD_VERBOSITY: 1  # 输出详细编译日志
       - name: Upload manylinux Wheels
         uses: actions/upload-artifact@v4
         with:
