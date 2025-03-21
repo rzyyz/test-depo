@@ -3,7 +3,6 @@ name: Build and Package
 on: [push]
 
 jobs:
-  # 生成源码包（sdist）
   build_sdist:
     runs-on: ubuntu-latest
     steps:
@@ -12,12 +11,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"  # 使用任意版本生成 sdist
+          python-version: "3.9"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel build
+          pip install pybind11 setuptools wheel build  # 确保安装 pybind11
 
       - name: Build sdist
         run: python -m build --sdist --no-isolation
@@ -28,12 +27,11 @@ jobs:
           name: sdist-package
           path: dist/*.tar.gz
 
-  # 生成普通 Linux 多版本 Wheel
   build_wheels:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]  # 支持多个 Python 版本
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
@@ -56,19 +54,18 @@ jobs:
           name: wheels-${{ matrix.python-version }}
           path: dist/*.whl
 
-  # 生成 manylinux 标准 Wheel（兼容性更强）
   build_manylinux_wheels:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Build manylinux wheels
-        uses: pypa/cibuildwheel@v2.16.2  # 官方推荐的工具
+        uses: pypa/cibuildwheel@v2.16.2
         env:
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"  # 覆盖所有 Python 版本
-          CIBW_ARCHS: "x86_64"          # 64 位架构
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014  # 使用兼容性镜像
-          CIBW_BEFORE_BUILD: "pip install pybind11"  # 安装编译依赖
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_ARCHS: "x86_64"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          CIBW_BEFORE_BUILD: "pip install pybind11"  # 确保安装编译依赖
 
       - name: Upload manylinux Wheels
         uses: actions/upload-artifact@v4
